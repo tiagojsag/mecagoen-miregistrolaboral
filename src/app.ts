@@ -2,6 +2,7 @@ import logger from './logger';
 import axios, { AxiosRequestConfig } from 'axios';
 import { parse } from 'node-html-parser';
 import eachLimit from 'async/eachLimit';
+import * as fs from "fs";
 import sleep from 'sleep';
 
 const init = async (): Promise<any> => {
@@ -126,6 +127,72 @@ const init = async (): Promise<any> => {
 
 
     await eachLimit(pendingDaysResponse.data.row, 1, validateDataRow)
+
+    // for those that are also lazy to validate this.
+    logger.info('Loading list of days pending validation')
+
+    const pendingMonthsRequestConfig: AxiosRequestConfig = {
+        method: 'post',
+        url: 'https://app.miregistrolaboral.es/control/ajax/clientes.php',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:82.0) Gecko/20100101 Firefox/82.0',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Origin': 'https://app.miregistrolaboral.es',
+            'Connection': 'keep-alive',
+            'Referer': 'https://app.miregistrolaboral.es/panel',
+            'Cookie': loginResponse.headers['set-cookie'],
+            'Pragma': 'no-cache',
+            'Cache-Control': 'no-cache',
+            'TE': 'Trailers'
+        },
+        data: `funct=cargar_firmas_pendientes&id_cli=${txtIdUsu}`
+    };
+
+    const pendingMonthsResponse = await axios(pendingMonthsRequestConfig);
+    const signatureImage = fs.readFileSync(process.env.SIGNATURE_PATH, {encoding: 'base64'});
+    const validateMonthDataRow = async (dataRow) => {
+        const dataRowHTML = parse(dataRow);
+        const pendingHours = dataRowHTML.querySelector('').getAttribute('data-horas-pendientes');
+        if (pendingHours =='0'){
+            const validateHours = dataRowHTML.querySelector('').getAttribute('data-horas-validadas');
+            const dayString:string = `${dataRowHTML.querySelector('').getAttribute('data-fecha')} ${dataRowHTML.querySelector('').getAttribute('data-year')}` ;
+
+            logger.info(`Validating ${validateHours} for ${dayString}`);
+
+
+            const validateDayRequestConfig:AxiosRequestConfig = {
+                method: 'post',
+                url: 'https://app.miregistrolaboral.es/control/ajax/upload.php',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:82.0) Gecko/20100101 Firefox/82.0',
+                    'Accept': '*/*',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Origin': 'https://app.miregistrolaboral.es',
+                    'Connection': 'keep-alive',
+                    'Referer': 'https://app.miregistrolaboral.es/panel',
+                    'Cookie': loginResponse.headers['set-cookie'],
+                    'Pragma': 'no-cache',
+                    'Cache-Control': 'no-cache',
+                    'TE': 'Trailers'
+                },
+                data: `'base64=${signatureImage}&id_cli=${txtIdUsu}&id_val=${dayString}&horas=${validateHours}`
+            };
+
+            const validateDayResponse = await axios(validateDayRequestConfig);
+
+            if (validateDayResponse.data.estado !== 'DONE') {
+                throw new Error(`Validating date (in spanish) ${dayString} FAILED, aborting`);
+            }
+            logger.info(`Validated month ${dayString} successfully!!!`);
+        }
+        sleep.sleep(process.env.DELAY || 2);
+    }
+    await eachLimit(pendingMonthsResponse.data.row, 1, validateMonthDataRow)
 };
 
 export { init };
