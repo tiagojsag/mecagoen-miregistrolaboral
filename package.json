@@ -1,0 +1,38 @@
+{
+  "name": "mecagoen-miregistrolaboral",
+  "version": "1.0.0",
+  "description": "mecagoen-miregistrolaboral",
+  "repository": "https://github.com/tiagojsag/mecagoen-miregistrolaboral",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node --files --project tsconfig.json -r tsconfig-paths/register src/index.ts"
+  },
+  "keywords": [
+    "nodejs"
+  ],
+  "author": {
+    "name": "tiagojsag",
+    "email": "tiagojsag@gmail..com"
+  },
+  "engines": {
+    "node": "~12"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "async": "^3.2.0",
+    "axios": "^0.21.0",
+    "bunyan": "^1.8.14",
+    "node-html-parser": "^2.0.0",
+    "sleep": "^6.3.0",
+    "typescript": "^4.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.6",
+    "@typescript-eslint/eslint-plugin": "^4.6.1",
+    "@typescript-eslint/parser": "^4.6.1",
+    "ts-node": "^9.0.0",
+    "tsconfig-paths": "^3.9.0",
+    "tslint": "^6.1.3",
+    "tslint-config-prettier": "^1.18.0"
+  }
+}
