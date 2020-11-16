@@ -125,8 +125,10 @@ const init = async (): Promise<any> => {
         sleep.sleep(process.env.DELAY || 2);
     }
 
-
-    await eachLimit(pendingDaysResponse.data.row, 1, validateDataRow)
+    if(pendingDaysResponse.data.estado == 'DONE'){
+        await eachLimit(pendingDaysResponse.data.row, 1, validateDataRow)
+    }
+    
 
     // for those that are also lazy to validate this.
     logger.info('Loading list of days pending validation')
