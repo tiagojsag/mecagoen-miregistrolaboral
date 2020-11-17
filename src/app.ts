@@ -3,7 +3,10 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { parse } from 'node-html-parser';
 import eachLimit from 'async/eachLimit';
 import * as fs from "fs";
+import * as dotenv from "dotenv";
 import sleep from 'sleep';
+
+dotenv.config()
 
 const init = async (): Promise<any> => {
 
@@ -131,7 +134,7 @@ const init = async (): Promise<any> => {
     
 
     // for those that are also lazy to validate this.
-    logger.info('Loading list of days pending validation')
+    logger.info(`Loading list of Months pending signature for ${txtIdUsu}`)
 
     const pendingMonthsRequestConfig: AxiosRequestConfig = {
         method: 'post',
@@ -154,15 +157,17 @@ const init = async (): Promise<any> => {
     };
 
     const pendingMonthsResponse = await axios(pendingMonthsRequestConfig);
-    const signatureImage = fs.readFileSync(process.env.SIGNATURE_PATH, {encoding: 'base64'});
+    logger.info(`${JSON.stringify(pendingMonthsResponse.data)}`)
+    const signatureImage = fs.readFileSync(process.env.SIGNATURE_PATH, {encoding: 'base64'}).toString();
+    
     const validateMonthDataRow = async (dataRow) => {
         const dataRowHTML = parse(dataRow);
         const pendingHours = dataRowHTML.querySelector('').getAttribute('data-horas-pendientes');
         if (pendingHours =='0'){
             const validateHours = dataRowHTML.querySelector('').getAttribute('data-horas-validadas');
-            const dayString:string = `${dataRowHTML.querySelector('').getAttribute('data-fecha')} ${dataRowHTML.querySelector('').getAttribute('data-year')}` ;
+            const monthString:string = `${dataRowHTML.querySelector('').getAttribute('data-fecha')}` ;
 
-            logger.info(`Validating ${validateHours} for ${dayString}`);
+            logger.info(`Validating ${validateHours} for ${monthString}`);
 
 
             const validateDayRequestConfig:AxiosRequestConfig = {
@@ -182,19 +187,21 @@ const init = async (): Promise<any> => {
                     'Cache-Control': 'no-cache',
                     'TE': 'Trailers'
                 },
-                data: `'base64=${signatureImage}&id_cli=${txtIdUsu}&id_val=${dayString}&horas=${validateHours}`
+                data: `base64=data:image/png;base64,${signatureImage}&cliente=${txtIdUsu}&id_val=${monthString}&horas=${validateHours}`
             };
 
             const validateDayResponse = await axios(validateDayRequestConfig);
 
             if (validateDayResponse.data.estado !== 'DONE') {
-                throw new Error(`Validating date (in spanish) ${dayString} FAILED, aborting`);
+                throw new Error(`Validating date (in spanish) ${monthString} FAILED, aborting`);
             }
-            logger.info(`Validated month ${dayString} successfully!!!`);
+            logger.info(`Validated month ${monthString} successfully!!!`);
         }
-        sleep.sleep(process.env.DELAY || 2);
+        sleep.sleep(process.env.DELAY || 5);
     }
+    if(pendingMonthsResponse.data.estado == 'DONE'){
     await eachLimit(pendingMonthsResponse.data.row, 1, validateMonthDataRow)
+    }
 };
 
 export { init };
