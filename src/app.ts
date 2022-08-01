@@ -1,6 +1,6 @@
 import logger from './logger';
 import axios, { AxiosRequestConfig } from 'axios';
-import { parse, valid } from 'node-html-parser';
+import { parse } from 'node-html-parser';
 import eachLimit from 'async/eachLimit';
 import fs from "fs";
 import sleep from 'sleep';
@@ -9,6 +9,22 @@ import path from 'path';
 const delay = process.env.DELAY || 3;
 
 const init = async (): Promise<any> => {
+
+    if (!process.env.MRL_USER) {
+        throw new Error('Missing MRL User');
+    }
+
+    if (!process.env.MRL_PASSWORD) {
+        throw new Error('Missing MRL Password');
+    }
+
+    if (!process.env.SIGNATURE_PATH && !process.env.SIGNATURE_STRING) {
+        logger.warn('Missing signature file path and content string. Skipping monthly signature.')
+    }
+
+    if (process.env.SIGNATURE_PATH && process.env.SIGNATURE_STRING) {
+        logger.warn('Both file path and content string present. Using file path.')
+    }
 
     const data = `funct=login&use=${encodeURIComponent(process.env.MRL_USER)}&pas=${encodeURIComponent(process.env.MRL_PASSWORD)}`;
 
@@ -47,7 +63,7 @@ const init = async (): Promise<any> => {
             'Accept-Language': 'en-US,en;q=0.5',
             'Connection': 'keep-alive',
             'Referer': 'https://app.miregistrolaboral.es/login',
-            'Cookie': loginResponse.headers['set-cookie'],
+            'Cookie': loginResponse.headers['set-cookie'].toString(),
             'Upgrade-Insecure-Requests': '1',
             'Pragma': 'no-cache',
             'Cache-Control': 'no-cache',
@@ -78,7 +94,7 @@ const init = async (): Promise<any> => {
             'Origin': 'https://app.miregistrolaboral.es',
             'Connection': 'keep-alive',
             'Referer': 'https://app.miregistrolaboral.es/panel',
-            'Cookie': loginResponse.headers['set-cookie'],
+            'Cookie': loginResponse.headers['set-cookie'].toString(),
             'Pragma': 'no-cache',
             'Cache-Control': 'no-cache',
             'TE': 'Trailers'
@@ -92,13 +108,13 @@ const init = async (): Promise<any> => {
 
     const validateDataRow = async (dataRow) => {
         const dataRowHTML = parse(dataRow);
-        const dayId = dataRowHTML.querySelector('').getAttribute('data-id');
-        const dayString:string = `${dataRowHTML.querySelector('').getAttribute('data-fecha')} ${dataRowHTML.querySelector('').getAttribute('data-year')}` ;
+        const dayId = dataRowHTML.querySelector('div').getAttribute('data-id');
+        const dayString: string = `${dataRowHTML.querySelector('div').getAttribute('data-fecha')} ${dataRowHTML.querySelector('div').getAttribute('data-year')}`;
 
         logger.info(`Validating date (in spanish) ${dayString}`);
 
 
-        const validateDayRequestConfig:AxiosRequestConfig = {
+        const validateDayRequestConfig: AxiosRequestConfig = {
             method: 'post',
             url: 'https://app.miregistrolaboral.es/control/ajax/clientes.php',
             headers: {
@@ -110,7 +126,7 @@ const init = async (): Promise<any> => {
                 'Origin': 'https://app.miregistrolaboral.es',
                 'Connection': 'keep-alive',
                 'Referer': 'https://app.miregistrolaboral.es/panel',
-                'Cookie': loginResponse.headers['set-cookie'],
+                'Cookie': loginResponse.headers['set-cookie'].toString(),
                 'Pragma': 'no-cache',
                 'Cache-Control': 'no-cache',
                 'TE': 'Trailers'
@@ -147,7 +163,7 @@ const init = async (): Promise<any> => {
             'Origin': 'https://app.miregistrolaboral.es',
             'Connection': 'keep-alive',
             'Referer': 'https://app.miregistrolaboral.es/panel',
-            'Cookie': loginResponse.headers['set-cookie'],
+            'Cookie': loginResponse.headers['set-cookie'].toString(),
             'Pragma': 'no-cache',
             'Cache-Control': 'no-cache',
             'TE': 'Trailers'
@@ -155,19 +171,29 @@ const init = async (): Promise<any> => {
         data: `funct=cargar_firmas_pendientes&id_cli=${txtIdUsu}`
     };
 
-    const pendingMonthsResponse = await axios(pendingMonthsRequestConfig);
-    const signatureImage = fs.readFileSync(path.resolve(process.cwd(), process.env.SIGNATURE_PATH), { encoding: 'base64' });
-    
+    let processMonthlySignature = true;
+
+    let signatureBase64Prefix = 'base64=data:image/png;base64,';
+    let signatureImage: string;
+    if (process.env.SIGNATURE_PATH) {
+        signatureImage = fs.readFileSync(path.resolve(process.cwd(), process.env.SIGNATURE_PATH), { encoding: 'base64' });
+    } else if (process.env.SIGNATURE_STRING) {
+        signatureImage = process.env.SIGNATURE_STRING;
+        signatureBase64Prefix = signatureImage.startsWith(signatureBase64Prefix) ? "" : signatureBase64Prefix;
+    } else {
+        processMonthlySignature = false;
+    }
+
     const validateMonthDataRow = async (dataRow) => {
         const dataRowHTML = parse(dataRow);
-        const pendingHours = dataRowHTML.querySelector('').getAttribute('data-horas-pendientes');
+        const pendingHours = dataRowHTML.querySelector('div').getAttribute('data-horas-pendientes');
         if (pendingHours === '0') {
-            const validateHours = dataRowHTML.querySelector('').getAttribute('data-horas-validadas');
-            const monthString:string = `${dataRowHTML.querySelector('').getAttribute('data-fecha')}` ;
+            const validateHours = dataRowHTML.querySelector('div').getAttribute('data-horas-validadas');
+            const monthString: string = `${dataRowHTML.querySelector('div').getAttribute('data-fecha')}`;
 
             logger.info(`Validating ${validateHours} for ${monthString}`);
 
-            const validateDayRequestConfig:AxiosRequestConfig = {
+            const validateDayRequestConfig: AxiosRequestConfig = {
                 method: 'post',
                 url: 'https://app.miregistrolaboral.es/ajax/upload.php',
                 headers: {
@@ -179,12 +205,12 @@ const init = async (): Promise<any> => {
                     'Origin': 'https://app.miregistrolaboral.es',
                     'Connection': 'keep-alive',
                     'Referer': 'https://app.miregistrolaboral.es/panel',
-                    'Cookie': loginResponse.headers['set-cookie'],
+                    'Cookie': loginResponse.headers['set-cookie'].toString(),
                     'Pragma': 'no-cache',
                     'Cache-Control': 'no-cache',
                     'TE': 'Trailers'
                 },
-                data: `base64=data:image/png;base64,${signatureImage}&cliente=${txtIdUsu}&id_val=${encodeURIComponent(monthString)}&horas=${validateHours}`,
+                data: `${signatureBase64Prefix}${signatureImage}&cliente=${txtIdUsu}&id_val=${encodeURIComponent(monthString)}&horas=${validateHours}`,
             };
 
             const validateDayResponse = await axios(validateDayRequestConfig);
@@ -197,9 +223,14 @@ const init = async (): Promise<any> => {
         sleep.sleep(delay);
     };
 
-    if (pendingMonthsResponse.data.estado === 'DONE') {
-        await eachLimit(pendingMonthsResponse.data.row, 1, validateMonthDataRow);
+    if (processMonthlySignature) {
+        const pendingMonthsResponse = await axios(pendingMonthsRequestConfig);
+
+        if (pendingMonthsResponse.data.estado === 'DONE') {
+            await eachLimit(pendingMonthsResponse.data.row, 1, validateMonthDataRow);
+        }
     }
+
 };
 
 export { init };

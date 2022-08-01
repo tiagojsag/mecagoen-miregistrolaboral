@@ -5,7 +5,7 @@ import { init } from 'app';
 dotenv.config();
 
 init().then(() => {
-    logger.info('Server running');
+    logger.info('Done');
 }, (err) => {
-    logger.error('Error running server', err);
+    logger.error('Error running app', err);
 });
