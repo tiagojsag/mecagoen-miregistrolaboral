@@ -16,3 +16,4 @@ Env vars:
 - MRL_USER: your username
 - MRL_PASSWORD: your password
 - DELAY: Delay, in seconds, between requests that validate your days.
+- SIGNATURE_PATH: path to your signature image (jpg)
