@@ -77,6 +77,7 @@ const init = async (): Promise<any> => {
 
     const bodyHTML = parse(bodyResponse.data);
     const txtIdUsu = bodyHTML.querySelector('#txtIdUsu').getAttribute('value');
+    const txtEmpresa = bodyHTML.querySelector('#txtEmpresa').getAttribute('value');
 
     logger.info(`txtUsu extracted, value found: ${txtIdUsu}`);
 
@@ -99,7 +100,7 @@ const init = async (): Promise<any> => {
             'Cache-Control': 'no-cache',
             'TE': 'Trailers'
         },
-        data: `funct=cargar_dias_pendientes&id_cli=${txtIdUsu}`
+        data: `funct=cargar_dias_pendientes&id_cli=${txtEmpresa}`
     };
 
     const pendingDaysResponse = await axios(pendingDaysRequestConfig);
@@ -109,6 +110,7 @@ const init = async (): Promise<any> => {
     const validateDataRow = async (dataRow) => {
         const dataRowHTML = parse(dataRow);
         const dayId = dataRowHTML.querySelector('div').getAttribute('data-id');
+        const date = dataRowHTML.querySelector('div').getAttribute('data-dia');
         const dayString: string = `${dataRowHTML.querySelector('div').getAttribute('data-fecha')} ${dataRowHTML.querySelector('div').getAttribute('data-year')}`;
 
         logger.info(`Validating date (in spanish) ${dayString}`);
@@ -131,7 +133,7 @@ const init = async (): Promise<any> => {
                 'Cache-Control': 'no-cache',
                 'TE': 'Trailers'
             },
-            data: `funct=validar_dia&id_cli=${txtIdUsu}&id=${dayId}`
+            data: `funct=validar_dia&id_cli=${txtEmpresa}&id=${dayId}&id_empleado=${txtIdUsu}&dia=${date}`
         };
 
         const validateDayResponse = await axios(validateDayRequestConfig);
@@ -168,7 +170,7 @@ const init = async (): Promise<any> => {
             'Cache-Control': 'no-cache',
             'TE': 'Trailers'
         },
-        data: `funct=cargar_firmas_pendientes&id_cli=${txtIdUsu}`
+        data: `funct=cargar_firmas_pendientes&id_cli=${txtEmpresa}`
     };
 
     let processMonthlySignature = true;
@@ -210,7 +212,7 @@ const init = async (): Promise<any> => {
                     'Cache-Control': 'no-cache',
                     'TE': 'Trailers'
                 },
-                data: `${signatureBase64Prefix}${signatureImage}&cliente=${txtIdUsu}&id_val=${encodeURIComponent(monthString)}&horas=${validateHours}`,
+                data: `${signatureBase64Prefix}${signatureImage}&cliente=${txtEmpresa}&id_val=${encodeURIComponent(monthString)}&horas=${validateHours}`,
             };
 
             const validateDayResponse = await axios(validateDayRequestConfig);
